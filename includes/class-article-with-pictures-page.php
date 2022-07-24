@@ -19,47 +19,120 @@ class Article_With_Pictures_Page
         );
 
         add_settings_field(
-            'timeout',
+            'list_image_background_color',
             // 输入框说明文字
-            '请求超时时间',
+            '缩略图背景颜色',
             array('Article_With_Pictures_Plugin', 'field_callback'),
             'article_with_pictures_page',
             'article_with_pictures_page_section',
             array(
-                'label_for' => 'timeout',
-                'form_type' => 'input',
-                'type' => 'number',
-                'form_desc' => '请求超时时间，默认为30秒'
-            )
-        );
-
-        add_settings_field(
-            'api_url',
-            // 输入框说明文字
-            '文章配图接口',
-            array('Article_With_Pictures_Plugin', 'field_callback'),
-            'article_with_pictures_page',
-            'article_with_pictures_page_section',
-            array(
-                'label_for' => 'api_url',
-                'form_type' => 'input',
-                'type' => 'url',
-                'form_desc' => '文章配图接口请求地址'
-            )
-        );
-
-        add_settings_field(
-            'cdkey',
-            // 输入框说明文字
-            '授权码',
-            array('Article_With_Pictures_Plugin', 'field_callback'),
-            'article_with_pictures_page',
-            'article_with_pictures_page_section',
-            array(
-                'label_for' => 'cdkey',
+                'label_for' => 'list_image_background_color',
                 'form_type' => 'input',
                 'type' => 'text',
-                'form_desc' => '如果文章配图接口需要授权码，则需要填写。否则，无需填写'
+                'form_desc' => '缩略图背景颜色，例如：#ffffff'
+            )
+        );
+
+        add_settings_field(
+            'list_image_text_color',
+            // 输入框说明文字
+            '缩略图文字颜色',
+            array('Article_With_Pictures_Plugin', 'field_callback'),
+            'article_with_pictures_page',
+            'article_with_pictures_page_section',
+            array(
+                'label_for' => 'list_image_text_color',
+                'form_type' => 'input',
+                'type' => 'text',
+                'form_desc' => '缩略图文字颜色，例如：#000000'
+            )
+        );
+
+        add_settings_field(
+            'list_image_text_size',
+            // 输入框说明文字
+            '缩略图文字大小',
+            array('Article_With_Pictures_Plugin', 'field_callback'),
+            'article_with_pictures_page',
+            'article_with_pictures_page_section',
+            array(
+                'label_for' => 'list_image_text_size',
+                'form_type' => 'input',
+                'type' => 'number',
+                'form_desc' => '缩略图文字大小，例如：16'
+            )
+        );
+
+        // 查询字体文件
+        $form_data = array();
+        $form_data[] = array(
+            'title' => '选择字体文件',
+            'value' => '0'
+        );
+        $font_dir = ARTICLE_WITH_PICTURES_PLUGIN_DIR . 'fonts';
+        $files = scandir($font_dir);
+        foreach ($files as $file) {
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+            if (preg_match('/\.ttf$/i', $file)) {
+                $form_data[] = array(
+                    'title' => $file,
+                    'value' => $file
+                );
+            }
+        }
+        add_settings_field(
+            'list_image_text_font',
+            // 输入框说明文字
+            '缩略图文字字体',
+            array('Article_With_Pictures_Plugin', 'field_callback'),
+            'article_with_pictures_page',
+            'article_with_pictures_page_section',
+            array(
+                'label_for' => 'list_image_text_font',
+                'form_type' => 'select',
+                'form_data' => $form_data,
+                'form_desc' => '请使用免费可商用的中文字体'
+            )
+        );
+
+        add_settings_field(
+            'list_image_text_multiline',
+            // 输入框说明文字
+            '缩略图文字单行显示',
+            array('Article_With_Pictures_Plugin', 'field_callback'),
+            'article_with_pictures_page',
+            'article_with_pictures_page_section',
+            array(
+                'label_for' => 'list_image_text_multiline',
+                'form_type' => 'select',
+                'form_data' => array(
+                    array(
+                        'title' => '是',
+                        'value' => '1'
+                    ),
+                    array(
+                        'title' => '否',
+                        'value' => '2'
+                    )
+                ),
+                'form_desc' => '文字是否在缩略图上显示一行，如果设置为否，则会在缩略图上显示多行文字'
+            )
+        );
+
+        add_settings_field(
+            'list_image_text_overflow',
+            // 输入框说明文字
+            '文字超出图片宽度后的替代文字',
+            array('Article_With_Pictures_Plugin', 'field_callback'),
+            'article_with_pictures_page',
+            'article_with_pictures_page_section',
+            array(
+                'label_for' => 'list_image_text_overflow',
+                'form_type' => 'input',
+                'type' => 'text',
+                'form_desc' => '如果文字超出了缩略图的宽度，则剩余的文字使用这里的替代文字显示'
             )
         );
 
@@ -94,17 +167,26 @@ class Article_With_Pictures_Page
         );
 
         add_settings_field(
-            'default_image',
+            'generate_image_type',
             // 输入框说明文字
-            '默认缩略图',
+            '主动生成特色图片',
             array('Article_With_Pictures_Plugin', 'field_callback'),
             'article_with_pictures_page',
             'article_with_pictures_page_section',
             array(
-                'label_for' => 'default_image',
-                'form_type' => 'input',
-                'type' => 'url',
-                'form_desc' => '如果缩略图无法生成，则使用此图片作为缩略图'
+                'label_for' => 'generate_image_type',
+                'form_type' => 'select',
+                'form_data' => array(
+                    array(
+                        'title' => '是',
+                        'value' => '1'
+                    ),
+                    array(
+                        'title' => '否',
+                        'value' => '2'
+                    )
+                ),
+                'form_desc' => '如果文章没有特色图片，设置为是将会主动生成特色图片。'
             )
         );
 

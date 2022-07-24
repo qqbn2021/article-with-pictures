@@ -3,7 +3,7 @@
  * Plugin Name:文章配图
  * Plugin URI:https://www.ggdoc.cn/plugin/3.html
  * Description:如果文章没有缩略图，可以通过本插件自动给文章生成缩略图，同时支持在文章内容页显示缩略图。
- * Version:0.0.1
+ * Version:0.0.2
  * Requires at least: 5.0
  * Requires PHP:5.3
  * Author:果果开发
@@ -53,9 +53,12 @@ add_action('admin_menu', array('Article_With_Pictures_Plugin', 'admin_menu'));
 // 在我的插件那添加设置的链接
 add_filter('plugin_action_links_' . plugin_basename(__FILE__), array('Article_With_Pictures_Plugin', 'link_setting'));
 // 修改文章缩略图
-if (!empty($article_with_pictures_option['api_url']) && !empty($article_with_pictures_option['list_image_width']) && !empty($article_with_pictures_option['list_image_height'])) {
-    add_filter('post_thumbnail_html', array('Article_With_Pictures_Plugin', 'post_thumbnail_html'), 10, 2);
+if (!empty($article_with_pictures_option['list_image_width']) && !empty($article_with_pictures_option['list_image_height'])) {
+    if (!empty($article_with_pictures_option['generate_image_type']) && $article_with_pictures_option['generate_image_type'] == 1){
+        add_action('the_post', array('Article_With_Pictures_Plugin', 'the_post'));
+    }
+    add_filter('post_thumbnail_html', array('Article_With_Pictures_Plugin', 'post_thumbnail_html'), 9999, 5);
 }
 if (!empty($article_with_pictures_option['content_image_type'])) {
-    add_filter('the_content', array('Article_With_Pictures_Plugin', 'the_content'), 1);
+    add_filter('the_content', array('Article_With_Pictures_Plugin', 'the_content'));
 }

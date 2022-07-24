@@ -8,42 +8,21 @@ class Article_With_Pictures_Plugin
     // 启用插件
     public static function plugin_activation()
     {
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'article_with_pictures';
-        $charset_collate = $wpdb->get_charset_collate();
-        $sql = <<<SQL
-CREATE TABLE $table_name (
-	`id` INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
-	`post_id` INT(10) UNSIGNED NOT NULL COMMENT '文章ID',
-	`title` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '文章标题' COLLATE 'utf8mb4_general_ci',
-	`width` SMALLINT(5) UNSIGNED NOT NULL DEFAULT '0' COMMENT '缩略图宽度',
-	`height` SMALLINT(5) UNSIGNED NOT NULL DEFAULT '0' COMMENT '缩略图高度',
-	`thumbnail_file` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '文章图片存储位置' COLLATE 'utf8mb4_general_ci',
-	`thumbnail` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '文章缩略图' COLLATE 'utf8mb4_general_ci',
-	`create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-	`update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-	PRIMARY KEY (`id`) USING BTREE
-) $charset_collate;
-SQL;
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-//	dbDelta( $sql );
-        // 如果表不存在才会执行创建
-        maybe_create_table($table_name, $sql);
         // 创建默认配置
         add_option('article_with_pictures_options', array(
-            'cdkey' => '',
-            'timeout' => 30,
-            'domain' => parse_url(get_home_url(), PHP_URL_HOST),
+            'list_image_background_color' => '#ffffff',
+            'list_image_text_color' => '#000000',
+            'list_image_text_size' => 16,
+            'list_image_text_multiline' => 1,
+            'list_image_text_overflow' => '...',
+            'generate_image_type' => 2,
+            'content_image_type' => 0
         ));
     }
 
     // 删除插件执行的代码
     public static function plugin_uninstall()
     {
-        // 删除表
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'article_with_pictures';
-        $wpdb->query('DROP TABLE IF EXISTS `' . $table_name . '`');
         // 删除配置
         delete_option('article_with_pictures_options');
     }
@@ -279,7 +258,7 @@ SQL;
         ?>
         <div class="wrap">
             <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
-            <form action="options.php" method="post">
+            <form action="options.php" method="post" enctype="multipart/form-data">
                 <?php
                 // 输出表单
                 settings_fields('article_with_pictures_page');
@@ -310,21 +289,56 @@ SQL;
 
     /**
      * 列表页面缩略图
-     * @param $html
-     * @param $post_id
+     * @param string $html
+     * @param int $post_id
+     * @param int $post_thumbnail_id
+     * @param int $size
+     * @param array|string $attr
      * @return string
      */
-    public static function post_thumbnail_html($html, $post_id)
+    public static function post_thumbnail_html($html, $post_id, $post_thumbnail_id, $size, $attr)
     {
-        if (empty($html) && 'post' === get_post_type($post_id)) {
+        if ('post' === get_post_type($post_id)) {
             $alt_text = get_the_title($post_id);
-            $image_src = self::get_article_image($post_id, $alt_text);
-            if (empty($image_src)) {
+            if (!empty($html)) {
+                if (!empty($post_thumbnail_id)) {
+                    $attached_file = get_attached_file($post_thumbnail_id);
+                    if (!empty($attached_file)) {
+                        $basename = basename($attached_file);
+                        // 如果不是插件生成的或者是插件生成的，直接返回
+                        if (!preg_match('/^article_with_pictures_plugin_[\w]{32}/i', $basename) || preg_match('/^article_with_pictures_plugin_' . preg_quote(self::get_image_key($alt_text)) . '/i', $basename)) {
+                            return $html;
+                        }
+                    }
+                    wp_delete_attachment($post_thumbnail_id, true);
+                    delete_post_thumbnail($post_id);
+                } else {
+                    return $html;
+                }
+            }
+            $attachment = self::generate_thumbnail($post_id, $alt_text);
+            if (empty($attachment['guid'])) {
                 return '';
             }
-            return '<img src="' . esc_url($image_src) . '" alt="' . esc_attr($alt_text) . '"/>';
+            if (!empty($html)) {
+                return preg_replace('/src=["][^"]+["]/i', 'src="' . esc_url($attachment['guid']) . '"', $html);
+            }
+            return '<img src="' . esc_url($attachment['guid']) . '" alt="' . esc_attr($alt_text) . '"/>';
         }
         return $html;
+    }
+
+    /**
+     * 如果文章没有缩略图，则生成缩略图
+     * @return void
+     */
+    public static function the_post()
+    {
+        global $post;
+        if (!has_post_thumbnail($post->ID) && $post->post_status === 'publish') {
+            // 没有缩略图，生成缩略图
+            self::generate_thumbnail($post->ID, $post->post_title);
+        }
     }
 
     /**
@@ -339,9 +353,9 @@ SQL;
                 global $article_with_pictures_option;
                 $post = get_post();
                 if (!empty($post)) {
-                    $post_thumbnail = self::get_article_image($post->ID, $post->post_title);
-                    if (!empty($post_thumbnail) && !empty($article_with_pictures_option['content_image_type'])) {
-                        $image_html = '<figure class="wp-block-image size-full"><img loading="lazy" src="' . esc_url($post_thumbnail) . '" alt="' . esc_attr($post->post_title) . '"/></figure>';
+                    $image_html = get_the_post_thumbnail($post);
+                    if (!empty($image_html) && !empty($article_with_pictures_option['content_image_type'])) {
+                        $image_html = '<figure class="wp-block-image size-full">' . $image_html . '</figure>';
                         switch ($article_with_pictures_option['content_image_type']) {
                             case 1:
                                 $content = $image_html . $content;
@@ -376,172 +390,74 @@ SQL;
     }
 
     /**
-     * 获取文章缩略图
-     * @param string $title 文章标题
+     * 生成文章缩略图
+     * @param string $post_title 文章标题
      * @param int $post_id 文章ID
-     * @return mixed|string
+     * @return bool|array
      */
-    public static function get_image($title = '', $post_id = 0)
+    public static function generate_thumbnail($post_id, $post_title)
     {
         global $article_with_pictures_option;
-        if (!empty($article_with_pictures_option['domain'])) {
-            $domain = $article_with_pictures_option['domain'];
-        } else {
-            $domain = parse_url(get_home_url(), PHP_URL_HOST);
+        if (empty($article_with_pictures_option['list_image_width'])) {
+            return false;
         }
-        if (!empty($article_with_pictures_option['cdkey'])) {
-            $cdkey = $article_with_pictures_option['cdkey'];
-        } else {
-            $cdkey = '';
+        if (empty($article_with_pictures_option['list_image_height'])) {
+            return false;
         }
-        $default_image = !empty($article_with_pictures_option['default_image']) ? $article_with_pictures_option['default_image'] : '';
-        if (!empty($article_with_pictures_option['api_url'])) {
-            // 使用接口获取图片
-            $timeout = 30;
-            if (!empty($article_with_pictures_option['timeout'])) {
-                $timeout = (int)$article_with_pictures_option['timeout'];
-            }
-            $response = wp_remote_post($article_with_pictures_option['api_url'], array(
-                'timeout' => $timeout,
-                'headers' => array(
-                    'GGDEV-CDKEY' => $cdkey,
-                    'GGDEV-ACTIVATE-DOMAIN' => $domain
-                ),
-                'body' => array(
-                    'title' => $title,
-                    'post_id' => $post_id,
-                    'image_width' => $article_with_pictures_option['list_image_width'],
-                    'image_height' => $article_with_pictures_option['list_image_height'],
-                )
-            ));
-            if (is_wp_error($response)) {
-                return $default_image;
-            }
-            $code = (int)wp_remote_retrieve_response_code($response);
-            if ($code !== 200) {
-                return $default_image;
-            }
-            $result = wp_remote_retrieve_body($response);
-            if (empty($result)) {
-                return $default_image;
-            }
-            $result_arr = json_decode($result, true);
-            if (empty($result_arr)) {
-                return $default_image;
-            }
-            if ($result_arr['status'] != 1) {
-                return $default_image;
-            }
-            if (empty($result_arr['data'])) {
-                return $default_image;
-            }
-            if (preg_match('/^http/i', $result_arr['data'])) {
-                self::save_article_image($post_id, $title, $result_arr['data']);
-                return $result_arr['data'];
-            } else if (preg_match('/^data:image/i', $result_arr['data'])) {
-                // 先将图片存储在本地，然后返回本地图片链接地址
-                $upload_dir = wp_upload_dir();
-                $reg = '/data:image\/([^;]+);base64,/i';
-                $image_ext = 'jpeg';
-                if (preg_match($reg, $result_arr['data'], $mat)) {
-                    $image_ext = strtolower($mat[1]);
-                }
-                if (!in_array($image_ext, array('bmp', 'gif', 'ico', 'jpeg', 'jpg', 'png', 'svg', 'tif', 'tiff', 'webp'))) {
-                    return $default_image;
-                }
-                $img = preg_replace($reg, '', $result_arr['data']);
-                $img = base64_decode($img);
-                if (empty($img)) {
-                    return $default_image;
-                }
-                // 检查图片是否为真实的图片
-                $im = @imagecreatefromstring($img);
-                if (!$im) {
-                    return $default_image;
-                }
-                imagedestroy($im);
-                $img_filename = md5($post_id) . '.' . $image_ext;
-                if (!file_put_contents($upload_dir['path'] . '/' . $img_filename, $img)) {
-                    return $default_image;
-                }
-                self::save_article_image($post_id, $title, $upload_dir['url'] . '/' . $img_filename, $upload_dir['subdir'] . '/' . $img_filename);
-                return $upload_dir['url'] . '/' . $img_filename;
-            } else {
-                return $default_image;
-            }
+        if (empty($article_with_pictures_option['list_image_text_font'])) {
+            return false;
         }
-        return $default_image;
-    }
-
-    /**
-     * 保存文章配图
-     * @param int $post_id 文章ID
-     * @param string $title 文章标题
-     * @param string $thumbnail 文章缩略图
-     * @param string $thumbnail_file 缩略图存储位置
-     * @return bool|int|mysqli_result|resource|null
-     */
-    public static function save_article_image($post_id, $title, $thumbnail, $thumbnail_file = '')
-    {
-        global $article_with_pictures_option;
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'article_with_pictures';
-        $sql = 'INSERT INTO `' . $table_name . '` (`post_id`,`title`,`width`,`height`,`thumbnail_file`,`thumbnail`) values(%d,%s,%d,%d,%s,%s)';
-        $query = $wpdb->prepare(
-            $sql,
-            $post_id,
-            $title,
-            $article_with_pictures_option['list_image_width'],
-            $article_with_pictures_option['list_image_height'],
-            $thumbnail_file,
-            $thumbnail
+        $font_file = ARTICLE_WITH_PICTURES_PLUGIN_DIR . 'fonts/' . $article_with_pictures_option['list_image_text_font'];
+        if (!file_exists($font_file)) {
+            return false;
+        }
+        $api = new Article_With_Pictures_Api($article_with_pictures_option['list_image_width'], $article_with_pictures_option['list_image_height'], $post_title, $font_file);
+        if (!empty($article_with_pictures_option['list_image_background_color'])) {
+            $background_rgb = $api->getRGB($article_with_pictures_option['list_image_background_color']);
+            if (empty($background_rgb)) {
+                return false;
+            }
+            $api->setBackgroundRGB($background_rgb);
+        }
+        if (!empty($article_with_pictures_option['list_image_text_color'])) {
+            $text_rgb = $api->getRGB($article_with_pictures_option['list_image_text_color']);
+            if (empty($text_rgb)) {
+                return false;
+            }
+            $api->setTextRGB($text_rgb);
+        }
+        if (!empty($article_with_pictures_option['list_image_text_size'])) {
+            $api->setFontSize($article_with_pictures_option['list_image_text_size']);
+        }
+        if (!empty($article_with_pictures_option['list_image_text_multiline'])) {
+            $api->setIsMultiLine($article_with_pictures_option['list_image_text_multiline'] == '2');
+        }
+        if (!empty($article_with_pictures_option['list_image_text_overflow'])) {
+            $api->setSingleLineText($article_with_pictures_option['list_image_text_overflow']);
+        }
+        $result = $api->getImage();
+        if (empty($result)) {
+            return false;
+        }
+        $post_mime_type = 'image/png';
+        if (function_exists('mime_content_type')) {
+            $post_mime_type = mime_content_type($result['path']);
+        } else if (function_exists('imagewebp')) {
+            $post_mime_type = 'image/webp';
+        }
+        $attachment = array(
+            'post_mime_type' => $post_mime_type,
+            'post_title' => $post_title,
+            'post_content' => '',
+            'post_status' => 'inherit',
+            'guid' => $result['url']
         );
-        return $wpdb->query($query);
-    }
-
-    /**
-     * 删除文章配图
-     * @param int $post_id 文章ID
-     * @return bool|int|mysqli_result|resource|null
-     */
-    public static function delete_article_image($post_id)
-    {
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'article_with_pictures';
-        $sql = 'DELETE FROM `' . $table_name . '` WHERE `post_id` = %d';
-        $query = $wpdb->prepare(
-            $sql,
-            $post_id
-        );
-        return $wpdb->query($query);
-    }
-
-    /**
-     * 获取当前文章缩略图
-     * @param int $post_id 文章ID
-     * @param string $title 文章标题
-     * @return mixed
-     */
-    public static function get_article_image($post_id, $title)
-    {
-        global $wpdb;
-        global $article_with_pictures_option;
-        $table_name = $wpdb->prefix . 'article_with_pictures';
-        $sql = 'SELECT `title`,`width`,`height`,`thumbnail` FROM `' . $table_name . '` WHERE `post_id` = %d LIMIT 1';
-        $query = $wpdb->prepare(
-            $sql,
-            $post_id
-        );
-        $result = $wpdb->get_results($query, 'ARRAY_A');
-        if (empty($result[0])) {
-            return self::get_image($title, $post_id);
-        }
-        // 文章标题变更，或者缩略图大小变了，重新生成
-        if ($title != $result[0]['title'] || $article_with_pictures_option['list_image_width'] != $result[0]['width'] || $article_with_pictures_option['list_image_height'] != $result[0]['height']) {
-            self::delete_article_image($post_id);
-            return self::get_image($title, $post_id);
-        }
-        return $result[0]['thumbnail'];
+        $attach_id = wp_insert_attachment($attachment, $result['path'], $post_id);
+        require_once(ABSPATH . 'wp-admin/includes/image.php');
+        $attach_data = wp_generate_attachment_metadata($attach_id, $result['url']);
+        wp_update_attachment_metadata($attach_id, $attach_data);
+        set_post_thumbnail($post_id, $attach_id);
+        return $attachment;
     }
 
     /**
@@ -557,5 +473,16 @@ SQL;
         array_unshift($links, $settings_link);
 
         return $links;
+    }
+
+    /**
+     * 获取文章对应的唯一文件名
+     * @param string $post_title
+     * @return string
+     */
+    public static function get_image_key($post_title)
+    {
+        global $article_with_pictures_option;
+        return md5('文章配图-' . $post_title . '-' . json_encode($article_with_pictures_option));
     }
 }
