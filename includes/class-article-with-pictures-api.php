@@ -56,6 +56,11 @@ class Article_With_Pictures_Api
     private $error = '';
 
     /**
+     * @var string 缩略图唯一值
+     */
+    private $image_key = '';
+
+    /**
      * 获取图片宽度
      * @return int
      */
@@ -142,7 +147,7 @@ class Article_With_Pictures_Api
      */
     public function setText($text)
     {
-        $this->text = $text;
+        $this->text = trim($text);
     }
 
     /**
@@ -236,18 +241,32 @@ class Article_With_Pictures_Api
     }
 
     /**
+     * 获取图片唯一值
+     * @return string
+     */
+    public function getImageKey()
+    {
+        return $this->image_key;
+    }
+
+    /**
+     * 设置图片唯一值
+     * @param string $image_key
+     */
+    public function setImageKey($image_key)
+    {
+        $this->image_key = $image_key;
+    }
+
+    /**
      * 构造方法
      * @param int $width 图片宽度
      * @param int $height 图片高度
-     * @param string $text 图片文字
-     * @param string $fontFile 字体文件
      */
-    public function __construct($width, $height, $text, $fontFile)
+    public function __construct($width, $height)
     {
         $this->setWidth($width);
         $this->setHeight($height);
-        $this->setText($text);
-        $this->setFontFile($fontFile);
     }
 
     /**
@@ -293,52 +312,66 @@ class Article_With_Pictures_Api
             $this->setError('创建真彩色图像失败');
             return false;
         }
+        // 使用背景颜色
         imagefilledrectangle($im, 0, 0, imagesx($im) - 1, imagesy($im) - 1, imagecolorallocate($im, $this->backgroundRGB[0], $this->backgroundRGB[1], $this->backgroundRGB[2]));
-        // 获取当前字体下的每个文字宽度和高度
-        $wordBbox = imagettfbbox($this->fontSize, 0, $this->fontFile, '果');
-        $wordWidth = abs($wordBbox[0] - $wordBbox[4]) + abs($wordBbox[0] * 2);
-        $wordHeight = abs($wordBbox[1] - $wordBbox[5]) + abs($wordBbox[1] * 2);
-        // 图片上每行最多文字
-        $lineTextNum = floor($this->width / $wordWidth);
-        // 图片上最多文字行数
-        $lineNum = floor($this->height / $wordHeight);
-        $text = $this->text;
-        $textColor = imagecolorallocate($im, $this->textRGB[0], $this->textRGB[1], $this->textRGB[2]);
-        if ($this->isMultiLine()) {
-            // 多行文字
-            $line = ceil(mb_strlen($text, 'utf-8') / $lineTextNum);
-            // 图片文字行数超了，就截取
-            if ($line > $lineNum) {
-                $line = $lineNum;
-                $text = mb_substr($text, 0, $lineTextNum * $line - 3, 'utf-8') . $this->singleLineText;
-            }
-            $startLen = mb_strlen($text, 'utf-8') % $lineTextNum;
-            if (0 === $startLen) {
-                $startLen = $lineTextNum;
-            }
-            for ($i = 1; $i <= $line; $i++) {
-                if (1 === $i) {
-                    $t = mb_substr($text, 0, $startLen, 'utf-8');
-                } else {
-                    $t = mb_substr($text, $startLen + ($i - 2) * $lineTextNum, $lineTextNum, 'utf-8');
+        if (!empty($this->text)) {
+            // 写文字
+            // 获取当前字体下的每个文字宽度和高度
+            $wordBbox = imagettfbbox($this->fontSize, 0, $this->fontFile, '果');
+            $wordWidth = abs($wordBbox[0] - $wordBbox[4]) + abs($wordBbox[0] * 2);
+            $wordHeight = abs($wordBbox[1] - $wordBbox[5]) + abs($wordBbox[1] * 2);
+            // 图片上每行最多文字
+            $lineTextNum = floor($this->width / $wordWidth) - 3;
+            // 图片上最多文字行数
+            $lineNum = floor($this->height / $wordHeight);
+            $text = $this->text;
+            $textColor = imagecolorallocate($im, $this->textRGB[0], $this->textRGB[1], $this->textRGB[2]);
+            if ($this->isMultiLine()) {
+                // 多行文字
+                $line = ceil(mb_strlen($text, 'utf-8') / $lineTextNum);
+                // 图片文字行数超了，就截取
+                if ($line > $lineNum) {
+                    $line = $lineNum;
+                    $textLen = $lineTextNum * $line - mb_strlen($this->singleLineText, 'utf-8');
+                    if ($textLen <= 0) {
+                        $text = $this->singleLineText;
+                    } else {
+                        $text = mb_substr($text, 0, $textLen, 'utf-8') . $this->singleLineText;
+                    }
                 }
-                $bbox = imagettfbbox($this->fontSize, 0, $this->fontFile, $t);
+                $startLen = mb_strlen($text, 'utf-8') % $lineTextNum;
+                if (0 === $startLen) {
+                    $startLen = $lineTextNum;
+                }
+                for ($i = 1; $i <= $line; $i++) {
+                    if (1 === $i) {
+                        $t = mb_substr($text, 0, $startLen, 'utf-8');
+                    } else {
+                        $t = mb_substr($text, $startLen + ($i - 2) * $lineTextNum, $lineTextNum, 'utf-8');
+                    }
+                    $bbox = imagettfbbox($this->fontSize, 0, $this->fontFile, $t);
+                    $x = ($this->width / 2) - ($bbox[4] / 2);
+                    $y = ($this->height / 2) - ($line * $wordHeight / 2) - $bbox[1];
+                    imagettftext($im, $this->fontSize, 0, (int)$x, (int)($y + $i * $wordHeight), $textColor, $this->fontFile, $t);
+                }
+            } else {
+                // 单行文字
+                if (mb_strlen($text, 'utf-8') > $lineTextNum) {
+                    $textLen = $lineTextNum - mb_strlen($this->singleLineText, 'utf-8');
+                    if ($textLen <= 0) {
+                        $text = $this->singleLineText;
+                    } else {
+                        $text = mb_substr($text, 0, $textLen, 'utf-8') . $this->singleLineText;
+                    }
+                }
+                $bbox = imagettfbbox($this->fontSize, 0, $this->fontFile, $text);
                 $x = $bbox[0] + ($this->width / 2) - ($bbox[4] / 2);
-                $y = ($this->height / 2) - ($line * $wordHeight / 2) - $bbox[1];
-                imagettftext($im, $this->fontSize, 0, (int)$x, (int)($y + $i * $wordHeight), $textColor, $this->fontFile, $t);
+                $y = $bbox[1] + ($this->height / 2) - ($bbox[5] / 2);
+                imagettftext($im, $this->fontSize, 0, (int)$x, (int)$y, $textColor, $this->fontFile, $text);
             }
-        } else {
-            // 单行文字
-            if (mb_strlen($text, 'utf-8') > $lineTextNum) {
-                $text = mb_substr($text, 0, $lineTextNum - 3, 'utf-8') . $this->singleLineText;
-            }
-            $bbox = imagettfbbox($this->fontSize, 0, $this->fontFile, $text);
-            $x = $bbox[0] + ($this->width / 2) - ($bbox[4] / 2);
-            $y = $bbox[1] + ($this->height / 2) - ($bbox[5] / 2);
-            imagettftext($im, $this->fontSize, 0, (int)$x, (int)$y, $textColor, $this->fontFile, $text);
         }
         $upload_dir = wp_upload_dir();
-        $img_filename = 'article_with_pictures_plugin_' . Article_With_Pictures_Plugin::get_image_key($this->getText());
+        $img_filename = 'article_with_pictures_plugin_' . $this->image_key;
         if (function_exists('imagewebp')) {
             $img_filename = $img_filename . '.webp';
             imagewebp($im, $upload_dir['path'] . '/' . $img_filename, $quality);

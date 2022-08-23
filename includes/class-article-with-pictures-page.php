@@ -19,23 +19,52 @@ class Article_With_Pictures_Page
         );
 
         add_settings_field(
-            'list_image_background_color',
-            // 输入框说明文字
-            '缩略图背景颜色',
+            'type',
+            '文章配图',
             array('Article_With_Pictures_Plugin', 'field_callback'),
             'article_with_pictures_page',
             'article_with_pictures_page_section',
             array(
-                'label_for' => 'list_image_background_color',
-                'form_type' => 'input',
-                'type' => 'text',
-                'form_desc' => '缩略图背景颜色，例如：#ffffff'
+                'label_for' => 'type',
+                'form_type' => 'select',
+                'form_data' => array(
+                    array(
+                        'title' => '关闭',
+                        'value' => '0'
+                    ),
+                    array(
+                        'title' => '背景颜色',
+                        'value' => '1'
+                    )
+                )
+            )
+        );
+
+        add_settings_field(
+            'list_image_background_text',
+            '添加缩略图文字',
+            array('Article_With_Pictures_Plugin', 'field_callback'),
+            'article_with_pictures_page',
+            'article_with_pictures_page_section',
+            array(
+                'label_for' => 'list_image_background_text',
+                'form_type' => 'select',
+                'form_data' => array(
+                    array(
+                        'title' => '是',
+                        'value' => '1'
+                    ),
+                    array(
+                        'title' => '否',
+                        'value' => '2'
+                    )
+                ),
+                'form_desc' => '设置为是后，将会在缩略图上添加文章标题文字'
             )
         );
 
         add_settings_field(
             'list_image_text_color',
-            // 输入框说明文字
             '缩略图文字颜色',
             array('Article_With_Pictures_Plugin', 'field_callback'),
             'article_with_pictures_page',
@@ -50,7 +79,6 @@ class Article_With_Pictures_Page
 
         add_settings_field(
             'list_image_text_size',
-            // 输入框说明文字
             '缩略图文字大小',
             array('Article_With_Pictures_Plugin', 'field_callback'),
             'article_with_pictures_page',
@@ -82,9 +110,13 @@ class Article_With_Pictures_Page
                 );
             }
         }
+        $form_desc = '仅支持.ttf格式的字体文件，且字体文件名称不能含有特殊符号。尽量使用拼音命名，例如：ziti1.ttf';
+        if (count($form_data) === 1) {
+            $fonts_dir = str_replace('\\', '/', ARTICLE_WITH_PICTURES_PLUGIN_DIR) . 'fonts';
+            $form_desc = '未上传中文字体文件（.ttf格式）至指定文件夹下：' . $fonts_dir;
+        }
         add_settings_field(
             'list_image_text_font',
-            // 输入框说明文字
             '缩略图文字字体',
             array('Article_With_Pictures_Plugin', 'field_callback'),
             'article_with_pictures_page',
@@ -93,13 +125,12 @@ class Article_With_Pictures_Page
                 'label_for' => 'list_image_text_font',
                 'form_type' => 'select',
                 'form_data' => $form_data,
-                'form_desc' => '请使用免费可商用的中文字体'
+                'form_desc' => $form_desc
             )
         );
 
         add_settings_field(
             'list_image_text_multiline',
-            // 输入框说明文字
             '缩略图文字单行显示',
             array('Article_With_Pictures_Plugin', 'field_callback'),
             'article_with_pictures_page',
@@ -122,8 +153,21 @@ class Article_With_Pictures_Page
         );
 
         add_settings_field(
+            'list_image_text_num',
+            '缩略图文字个数',
+            array('Article_With_Pictures_Plugin', 'field_callback'),
+            'article_with_pictures_page',
+            'article_with_pictures_page_section',
+            array(
+                'label_for' => 'list_image_text_num',
+                'form_type' => 'input',
+                'type' => 'number',
+                'form_desc' => '缩略图上最多显示的文字个数，超过设置则会截取'
+            )
+        );
+
+        add_settings_field(
             'list_image_text_overflow',
-            // 输入框说明文字
             '文字超出图片宽度后的替代文字',
             array('Article_With_Pictures_Plugin', 'field_callback'),
             'article_with_pictures_page',
@@ -138,7 +182,6 @@ class Article_With_Pictures_Page
 
         add_settings_field(
             'list_image_width',
-            // 输入框说明文字
             '缩略图宽度',
             array('Article_With_Pictures_Plugin', 'field_callback'),
             'article_with_pictures_page',
@@ -153,7 +196,6 @@ class Article_With_Pictures_Page
 
         add_settings_field(
             'list_image_height',
-            // 输入框说明文字
             '缩略图高度',
             array('Article_With_Pictures_Plugin', 'field_callback'),
             'article_with_pictures_page',
@@ -167,8 +209,44 @@ class Article_With_Pictures_Page
         );
 
         add_settings_field(
+            'list_image_default_background_color',
+            '缩略图默认背景颜色',
+            array('Article_With_Pictures_Plugin', 'field_callback'),
+            'article_with_pictures_page',
+            'article_with_pictures_page_section',
+            array(
+                'label_for' => 'list_image_default_background_color',
+                'form_type' => 'input',
+                'type' => 'text',
+                'form_desc' => '缩略图默认背景颜色，例如：#dda0dd'
+            )
+        );
+
+        add_settings_field(
+            'list_image_auto_update',
+            '自动更新缩略图',
+            array('Article_With_Pictures_Plugin', 'field_callback'),
+            'article_with_pictures_page',
+            'article_with_pictures_page_section',
+            array(
+                'label_for' => 'list_image_auto_update',
+                'form_type' => 'select',
+                'form_data' => array(
+                    array(
+                        'title' => '是',
+                        'value' => '1'
+                    ),
+                    array(
+                        'title' => '否',
+                        'value' => '2'
+                    )
+                ),
+                'form_desc' => '设置为是后，当设置变化后，将会自动重写生成缩略图'
+            )
+        );
+
+        add_settings_field(
             'generate_image_type',
-            // 输入框说明文字
             '主动生成特色图片',
             array('Article_With_Pictures_Plugin', 'field_callback'),
             'article_with_pictures_page',
@@ -192,7 +270,6 @@ class Article_With_Pictures_Page
 
         add_settings_field(
             'content_image_type',
-            // 输入框说明文字
             '文章内容显示缩略图',
             array('Article_With_Pictures_Plugin', 'field_callback'),
             'article_with_pictures_page',
@@ -224,5 +301,60 @@ class Article_With_Pictures_Page
                 )
             )
         );
+
+        add_settings_field(
+            'list_image_auto_save',
+            '将缩略图保存至文章',
+            array('Article_With_Pictures_Plugin', 'field_callback'),
+            'article_with_pictures_page',
+            'article_with_pictures_page_section',
+            array(
+                'label_for' => 'list_image_auto_save',
+                'form_type' => 'select',
+                'form_data' => array(
+                    array(
+                        'title' => '是',
+                        'value' => '1'
+                    ),
+                    array(
+                        'title' => '否',
+                        'value' => '2'
+                    )
+                ),
+                'form_desc' => '设置为是后，插件生成的缩略图将会更新到文章里永久保存'
+            )
+        );
+
+        // 背景颜色
+        add_settings_section(
+            'background_color_section',
+            '使用背景颜色生成缩略图',
+            array('Article_With_Pictures_Page', 'background_color_text'),
+            'article_with_pictures_page'
+        );
+
+        add_settings_field(
+            'background_colors',
+            '背景颜色|文字颜色',
+            array('Article_With_Pictures_Plugin', 'field_callback'),
+            'article_with_pictures_page',
+            'background_color_section',
+            array(
+                'label_for' => 'background_colors',
+                'form_type' => 'textarea',
+                'form_desc' => '每行一个设置，每个设置可以使用|分隔背景颜色和文字颜色。如果设置只包含一种颜色，则会使用默认的文字颜色'
+            )
+        );
+    }
+
+    /**
+     * 使用背景颜色生成缩略图说明
+     * @return void
+     */
+    public static function background_color_text()
+    {
+        ?>
+        可以设置多组背景颜色来生成缩略图
+        <?php
     }
 }

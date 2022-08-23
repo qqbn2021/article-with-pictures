@@ -10,13 +10,20 @@ class Article_With_Pictures_Plugin
     {
         // 创建默认配置
         add_option('article_with_pictures_options', array(
-            'list_image_background_color' => '#ffffff',
             'list_image_text_color' => '#000000',
+            'list_image_default_background_color' => '#dda0dd',
             'list_image_text_size' => 16,
             'list_image_text_multiline' => 1,
+            'list_image_auto_update' => 1,
+            'list_image_background_text' => 2,
             'list_image_text_overflow' => '...',
             'generate_image_type' => 2,
-            'content_image_type' => 0
+            'list_image_auto_save' => 2,
+            'type' => 0,
+            'list_image_width' => 480,
+            'list_image_height' => 300,
+            'content_image_type' => 0,
+            'background_colors' => '#5b8982|#ffffff' . PHP_EOL . '#45545f|#cec6b6' . PHP_EOL . '#d47655|#e1f8e1' . PHP_EOL . '#7379b0|#c6edec'
         ));
     }
 
@@ -39,9 +46,9 @@ class Article_With_Pictures_Plugin
         // 表单的名称
         $input_name = 'article_with_pictures_options[' . $id . ']';
         // 获取表单选项中的值
-        global $article_with_pictures_option;
+        global $article_with_pictures_options;
         // 表单的值
-        $input_value = isset($article_with_pictures_option[$id]) ? $article_with_pictures_option[$id] : '';
+        $input_value = isset($article_with_pictures_options[$id]) ? $article_with_pictures_options[$id] : '';
         // 表单的类型
         $form_type = isset($args['form_type']) ? $args['form_type'] : 'input';
         // 输入表单说明
@@ -298,6 +305,11 @@ class Article_With_Pictures_Plugin
      */
     public static function post_thumbnail_html($html, $post_id, $post_thumbnail_id, $size, $attr)
     {
+        // 不自动更新缩略图
+        global $article_with_pictures_options;
+        if (!empty($article_with_pictures_options['list_image_auto_update']) && 2 == $article_with_pictures_options['list_image_auto_update'] && !empty($html)) {
+            return $html;
+        }
         if ('post' === get_post_type($post_id)) {
             $alt_text = get_the_title($post_id);
             if (!empty($html)) {
@@ -306,7 +318,7 @@ class Article_With_Pictures_Plugin
                     if (!empty($attached_file)) {
                         $basename = basename($attached_file);
                         // 如果不是插件生成的或者是插件生成的，直接返回
-                        if (!preg_match('/^article_with_pictures_plugin_[\w]{32}/i', $basename) || preg_match('/^article_with_pictures_plugin_' . preg_quote(self::get_image_key($alt_text)) . '/i', $basename)) {
+                        if (!preg_match('/^article_with_pictures_plugin_[a-z0-9]{32}/i', $basename) || preg_match('/^article_with_pictures_plugin_' . preg_quote(self::get_image_key($alt_text)) . '/i', $basename)) {
                             return $html;
                         }
                     }
@@ -323,7 +335,7 @@ class Article_With_Pictures_Plugin
             if (!empty($html)) {
                 return preg_replace('/src=["][^"]+["]/i', 'src="' . esc_url($attachment['guid']) . '"', $html);
             }
-            return '<img src="' . esc_url($attachment['guid']) . '" alt="' . esc_attr($alt_text) . '"/>';
+            return '<img class="attachment-post-thumbnail size-post-thumbnail wp-post-image" src="' . esc_url($attachment['guid']) . '" alt="' . esc_attr($alt_text) . '"/>';
         }
         return $html;
     }
@@ -350,13 +362,13 @@ class Article_With_Pictures_Plugin
     {
         if (is_single()) {
             if (!preg_match('/<img/i', $content)) {
-                global $article_with_pictures_option;
+                global $article_with_pictures_options;
                 $post = get_post();
                 if (!empty($post)) {
                     $image_html = get_the_post_thumbnail($post);
-                    if (!empty($image_html) && !empty($article_with_pictures_option['content_image_type'])) {
-                        $image_html = '<figure class="wp-block-image size-full">' . $image_html . '</figure>';
-                        switch ($article_with_pictures_option['content_image_type']) {
+                    if (!empty($image_html) && !empty($article_with_pictures_options['content_image_type'])) {
+                        $image_html = '<figure class="wp-block-image size-full aligncenter">' . $image_html . '</figure>';
+                        switch ($article_with_pictures_options['content_image_type']) {
                             case 1:
                                 $content = $image_html . $content;
                                 break;
@@ -367,8 +379,8 @@ class Article_With_Pictures_Plugin
                                 $image_start_num = 0;
                                 if (preg_match_all('/<p[^>]*>/i', $content, $mat)) {
                                     $p_nums = count($mat[0]);
-                                    if ($article_with_pictures_option['content_image_type'] == 2) {
-                                        $image_start_num = intval($p_nums / 2);
+                                    if ($article_with_pictures_options['content_image_type'] == 2) {
+                                        $image_start_num = intval(($p_nums - 1) / 2);
                                     } else {
                                         $image_start_num = mt_rand(0, $p_nums - 1);
                                     }
@@ -381,6 +393,13 @@ class Article_With_Pictures_Plugin
                                     }
                                     return $matches[0];
                                 }, $content);
+                        }
+                        // 将缩略图内容永久保存到文章
+                        if (!empty($article_with_pictures_options['list_image_auto_save']) && 1 == $article_with_pictures_options['list_image_auto_save']) {
+                            wp_update_post(array(
+                                'ID' => $post->ID,
+                                'post_content' => $content,
+                            ));
                         }
                     }
                 }
@@ -397,43 +416,93 @@ class Article_With_Pictures_Plugin
      */
     public static function generate_thumbnail($post_id, $post_title)
     {
-        global $article_with_pictures_option;
-        if (empty($article_with_pictures_option['list_image_width'])) {
+        global $article_with_pictures_options;
+        if (empty($article_with_pictures_options['list_image_width'])) {
             return false;
         }
-        if (empty($article_with_pictures_option['list_image_height'])) {
+        if (empty($article_with_pictures_options['list_image_height'])) {
             return false;
         }
-        if (empty($article_with_pictures_option['list_image_text_font'])) {
-            return false;
+        $post_title = trim($post_title);
+        $api = new Article_With_Pictures_Api($article_with_pictures_options['list_image_width'], $article_with_pictures_options['list_image_height']);
+        // 设置图片唯一值
+        if (!empty($article_with_pictures_options['list_image_auto_save']) && 1 == $article_with_pictures_options['list_image_auto_save']) {
+            $api->setImageKey($post_id . '_permanent_' . self::get_image_key($post_title));
+        } else {
+            $api->setImageKey(self::get_image_key($post_title));
         }
-        $font_file = ARTICLE_WITH_PICTURES_PLUGIN_DIR . 'fonts/' . $article_with_pictures_option['list_image_text_font'];
-        if (!file_exists($font_file)) {
-            return false;
+        // 设置图片默认背景颜色
+        if (!empty($article_with_pictures_options['list_image_default_background_color'])) {
+            $default_background_rgb = $api->getRGB($article_with_pictures_options['list_image_default_background_color']);
+            if (!empty($default_background_rgb)) {
+                $api->setBackgroundRGB($default_background_rgb);
+            }
         }
-        $api = new Article_With_Pictures_Api($article_with_pictures_option['list_image_width'], $article_with_pictures_option['list_image_height'], $post_title, $font_file);
-        if (!empty($article_with_pictures_option['list_image_background_color'])) {
-            $background_rgb = $api->getRGB($article_with_pictures_option['list_image_background_color']);
+        // 添加缩略图文字
+        if (!empty($article_with_pictures_options['list_image_background_text']) && 1 == $article_with_pictures_options['list_image_background_text']) {
+            if (!empty($article_with_pictures_options['list_image_text_font'])) {
+                $font_file = ARTICLE_WITH_PICTURES_PLUGIN_DIR . 'fonts/' . $article_with_pictures_options['list_image_text_font'];
+                if (file_exists($font_file)) {
+                    $api->setFontFile($font_file);
+                    if (!empty($article_with_pictures_options['list_image_text_num'])) {
+                        $api->setText(mb_substr($post_title, 0, $article_with_pictures_options['list_image_text_num'], 'utf-8'));
+                    } else {
+                        $api->setText($post_title);
+                    }
+                }
+            }
+            if (!empty($article_with_pictures_options['list_image_text_color'])) {
+                $text_rgb = $api->getRGB($article_with_pictures_options['list_image_text_color']);
+                if (empty($text_rgb)) {
+                    return false;
+                }
+                $api->setTextRGB($text_rgb);
+            }
+            if (!empty($article_with_pictures_options['list_image_text_size'])) {
+                $api->setFontSize($article_with_pictures_options['list_image_text_size']);
+            }
+            if (!empty($article_with_pictures_options['list_image_text_multiline'])) {
+                $api->setIsMultiLine($article_with_pictures_options['list_image_text_multiline'] == '2');
+            }
+            if (!empty($article_with_pictures_options['list_image_text_overflow'])) {
+                $api->setSingleLineText($article_with_pictures_options['list_image_text_overflow']);
+            }
+        }
+        // 背景颜色
+        if ($article_with_pictures_options['type'] == 1) {
+            if (empty($article_with_pictures_options['background_colors'])) {
+                return false;
+            }
+            // 换行转为数组
+            $background_colors = explode(PHP_EOL, $article_with_pictures_options['background_colors']);
+            if (empty($background_colors)) {
+                return false;
+            }
+            // 获取有效的配置
+            foreach ($background_colors as $k => $background_color) {
+                if (empty($background_color) || !preg_match('/#[a-f0-9]{6}/i', $background_color)) {
+                    unset($background_colors[$k]);
+                }
+            }
+            if (empty($background_colors)) {
+                return false;
+            }
+            // 打乱数组
+            shuffle($background_colors);
+            // 取第一个值
+            $tmp = explode('|', $background_colors[0]);
+            $background_rgb = $api->getRGB(trim($tmp[0]));
             if (empty($background_rgb)) {
                 return false;
             }
             $api->setBackgroundRGB($background_rgb);
-        }
-        if (!empty($article_with_pictures_option['list_image_text_color'])) {
-            $text_rgb = $api->getRGB($article_with_pictures_option['list_image_text_color']);
-            if (empty($text_rgb)) {
-                return false;
+            if (2 == count($tmp)) {
+                $text_rgb = $api->getRGB(trim($tmp[1]));
+                if (empty($text_rgb)) {
+                    return false;
+                }
+                $api->setTextRGB($text_rgb);
             }
-            $api->setTextRGB($text_rgb);
-        }
-        if (!empty($article_with_pictures_option['list_image_text_size'])) {
-            $api->setFontSize($article_with_pictures_option['list_image_text_size']);
-        }
-        if (!empty($article_with_pictures_option['list_image_text_multiline'])) {
-            $api->setIsMultiLine($article_with_pictures_option['list_image_text_multiline'] == '2');
-        }
-        if (!empty($article_with_pictures_option['list_image_text_overflow'])) {
-            $api->setSingleLineText($article_with_pictures_option['list_image_text_overflow']);
         }
         $result = $api->getImage();
         if (empty($result)) {
@@ -482,7 +551,22 @@ class Article_With_Pictures_Plugin
      */
     public static function get_image_key($post_title)
     {
-        global $article_with_pictures_option;
-        return md5('文章配图-' . $post_title . '-' . json_encode($article_with_pictures_option));
+        global $article_with_pictures_options;
+        return md5('文章配图-' . $post_title . '-' . json_encode($article_with_pictures_options));
+    }
+
+    /**
+     * 添加图片标签
+     * @param $attr
+     * @param $attachment
+     * @return mixed
+     */
+    public static function wp_get_attachment_image_attributes($attr, $attachment = null)
+    {
+        if (empty($attr['alt'])) {
+            $img_title = esc_attr(trim(strip_tags($attachment->post_title)));
+            $attr['alt'] = $img_title;
+        }
+        return $attr;
     }
 }
