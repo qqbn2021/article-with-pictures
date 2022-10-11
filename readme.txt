@@ -5,7 +5,7 @@ Tags:文章图片, 配图, 文章配图, 缩略图, 标题转图, Article with p
 Requires at least: 5.0
 Requires PHP:5.3
 Tested up to: 6.0
-Stable tag: 0.0.3
+Stable tag: 0.0.4
 License: GNU General Public License v2.0 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -50,16 +50,16 @@ License URI: http://www.gnu.org/licenses/gpl-2.0.html
 确认是否启用了“添加缩略图文字”功能，然后确认是否选择了“缩略图文字字体”。
 
 = 为什么缩略图文字字体无法选择？ =
-安装插件后，需要自行下载中文字体文件(后缀为.ttf文件)，将字体文件上传至/wp-content/plugins/article-with-pictures（商业版为：article-with-pictures-vip）/fonts目录下。注意：字体文件的名称不能有空格等特殊符号，建议使用拼音重新命名字体文件，例如：ziti1.ttf、ziti2.ttf。
+安装插件后，需要自行下载中文字体文件(后缀为.ttf文件)，将字体文件上传至/wp-content/plugins/article-with-pictures/fonts目录下。注意：字体文件的名称不能有空格等特殊符号，建议使用拼音重新命名字体文件，例如：ziti1.ttf、ziti2.ttf。
 
 = 为什么没有显示缩略图？ =
 首先确认自己的主题是否支持缩略图功能，如果支持，尝试在文章配图设置中将主动生成特色图片设置为是。如果依旧不行，请联系作者处理。
 
 = 为什么生成的缩略图文字模糊？ =
-这很有可能是插件设置中的缩略图宽度、高度，与主题显示的缩略图宽度、高度不一致造成的，请确保它们的高度与宽度一致（插件配置中的宽度与高度，需要与主题显示的缩略图宽度、高度一致）。
+这与缩略图的高度与宽度、字体文件、字体大小等有关，调整相关设置以达到完美显示即可。
 
 = 生成的缩略图在哪里查看、哪里删除？ =
-可以在网站后台-媒体-媒体库页面看到。插件生成的缩略图文件名是以article_with_pictures_plugin_开头的，可以通过搜索article_with_pictures_plugin_找到所有插件生成的缩略图，然后就可以执行删除。
+可以在网站后台-媒体-媒体库页面看到或删除。
 
 = 卸载插件后，是否会删除缩略图？ =
 卸载插件后，除生成的缩略图不会删除，其余内容均会删除。
@@ -84,8 +84,14 @@ License URI: http://www.gnu.org/licenses/gpl-2.0.html
 3. 多组背景颜色和文字颜色设置
 4. 列表显示缩略图
 5. 内容页显示缩略图
+6. 搜索引擎展示文章配图图片
 
 == Upgrade Notice ==
+
+= 0.0.4 =
+* 新增缩略图每行文字个数、行数限制等设置
+* 新增指定分类使用文章配图设置
+* 新增缩略图文件名称、格式自定义设置
 
 = 0.0.3 =
 * 新增是否在缩略图上添加文字设置
@@ -105,6 +111,11 @@ License URI: http://www.gnu.org/licenses/gpl-2.0.html
 参考Changelog说明
 
 == Changelog ==
+
+= 0.0.4 =
+* 新增缩略图每行文字个数、行数限制等设置
+* 新增指定分类使用文章配图设置
+* 新增缩略图文件名称、格式自定义设置
 
 = 0.0.3 =
 * 新增是否在缩略图上添加文字设置
